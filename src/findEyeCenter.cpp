@@ -74,10 +74,10 @@ cv::Mat computeMatXGradient(const cv::Mat &mat) {
 
 #pragma mark Main Algorithm
 
-void testPossibleCentersFormula(int x, int y, const cv::Mat &weight,double gx, double gy, cv::Mat &out) {
+void testPossibleCentersFormula(int x, int y, const cv::Mat &weight, double gx, double gy, cv::Mat &out) {
   // for all possible centers
   for (int cy = 0; cy < out.rows; ++cy) {
-    double *Or = out.ptr<double>(cy);
+    double *Or = out.ptr<double>(cy);		// Out row
     const unsigned char *Wr = weight.ptr<unsigned char>(cy);
     for (int cx = 0; cx < out.cols; ++cx) {
       if (x == cx && y == cy) {
@@ -108,6 +108,8 @@ cv::Point findEyeCenter(cv::Mat face, cv::Rect eye, std::string debugWindow) {
   scaleToFastSize(eyeROIUnscaled, eyeROI);
   // draw eye region
   rectangle(face,eye,1234);
+  line( face, cv::Point(eye.x, eye.y), cv::Point(eye.x+eye.width, eye.y+eye.height), 1234);
+  line( face, cv::Point(eye.x, eye.y+eye.height), cv::Point(eye.x+eye.width, eye.y), 1234);
   //-- Find the gradient
   cv::Mat gradientX = computeMatXGradient(eyeROI);
   cv::Mat gradientY = computeMatXGradient(eyeROI.t()).t();
@@ -170,7 +172,22 @@ cv::Point findEyeCenter(cv::Mat face, cv::Rect eye, std::string debugWindow) {
   //-- Find the maximum point
   cv::Point maxP;
   double maxVal;
+
+
+// jml mai2021
+  for (int y = 0; y < out.rows; ++y) {
+    float dy = fabs( out.rows/2.-y );
+    float halfDiag = sqrt(out.rows*out.rows+out.cols*out.cols)/2.;
+    unsigned char *row = out.ptr<unsigned char>(y);
+    for (int x = 0; x < out.cols; ++x) {
+      float dx = fabs( out.cols/2.-x );
+      float offset = 1.*(halfDiag-sqrt(dx*dx+dy*dy)) / halfDiag;
+      out.at<unsigned char>(y,x) += (unsigned char)offset;
+    }
+  }
+ 
   cv::minMaxLoc(out, NULL,&maxVal,NULL,&maxP);
+
   //-- Flood fill the edges
   if(kEnablePostProcess) {
     cv::Mat floodClone;

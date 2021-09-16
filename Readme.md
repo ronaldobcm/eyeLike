@@ -12,6 +12,8 @@ If you're looking for open source your only real bet is [Pupil](http://pupil-lab
 The eye center tracking works well but I don't have a reference point like eye corner yet so it can't actually track
 where the user is looking.
 
+Current version detects both eyes to improve 3d head tracking. Eyes position is presented in global image coordinates.
+
 If anyone with more experience than me has ideas on how to effectively track a reference point or head pose
 so that the gaze point on the screen can be calculated contact me.
 

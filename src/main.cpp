@@ -43,20 +43,23 @@ int main( int argc, const char** argv ) {
   cv::Mat frame;
 
   // Load the cascades
-  if( !face_cascade.load( face_cascade_name ) ){ printf("--(!)Error loading face cascade, please change face_cascade_name in source code.\n"); return -1; };
-  cv::namedWindow(main_window_name,CV_WINDOW_NORMAL);
+  if( !face_cascade.load( face_cascade_name ) ) { 
+    printf("--(!)Error loading face cascade, please change face_cascade_name in source code.\n"); 
+    return -1; 
+  }
+  cv::namedWindow(main_window_name, CV_WINDOW_NORMAL);
   cv::moveWindow(main_window_name, 400, 100);
-  cv::namedWindow(face_window_name,CV_WINDOW_NORMAL);
+  cv::namedWindow(face_window_name, CV_WINDOW_NORMAL);
   cv::moveWindow(face_window_name, 10, 100);
-  cv::namedWindow("Right Eye",CV_WINDOW_NORMAL);
+  cv::namedWindow("Right Eye", CV_WINDOW_NORMAL);
   cv::moveWindow("Right Eye", 10, 600);
-  cv::namedWindow("Left Eye",CV_WINDOW_NORMAL);
+  cv::namedWindow("Left Eye", CV_WINDOW_NORMAL);
   cv::moveWindow("Left Eye", 10, 800);
 
   /* As the matrix dichotomy will not be applied, these windows are useless.
-  cv::namedWindow("aa",CV_WINDOW_NORMAL);
+  cv::namedWindow("aa", CV_WINDOW_NORMAL);
   cv::moveWindow("aa", 10, 800);
-  cv::namedWindow("aaa",CV_WINDOW_NORMAL);
+  cv::namedWindow("aaa", CV_WINDOW_NORMAL);
   cv::moveWindow("aaa", 10, 800);*/
 
   createCornerKernels();
@@ -81,7 +84,10 @@ int main( int argc, const char** argv ) {
 
       // Apply the classifier to the frame
       if( !frame.empty() ) {
+	//std::cout << "Frame size: " << frame.cols << ", " << frame.rows << "\n";
         detectAndDisplay( frame );
+
+
       }
       else {
         printf(" --(!) No captured frame -- Break!");
@@ -104,7 +110,7 @@ int main( int argc, const char** argv ) {
   return 0;
 }
 
-void findEyes(cv::Mat frame_gray, cv::Rect face) {
+cv::Rect findEyes(cv::Mat frame_gray, cv::Rect face) {
   cv::Mat faceROI = frame_gray(face);
   cv::Mat debugFace = faceROI;
 
@@ -152,9 +158,18 @@ void findEyes(cv::Mat frame_gray, cv::Rect face) {
   rightPupil.y += rightEyeRegion.y;
   leftPupil.x += leftEyeRegion.x;
   leftPupil.y += leftEyeRegion.y;
+
+  cv::Rect singleEye;
+  singleEye.x = (rightPupil.x+leftPupil.x) / 2.;
+  singleEye.y = (rightPupil.y+leftPupil.y) / 2.; 
+  singleEye.width  = rightPupil.x-leftPupil.x;
+  singleEye.height = rightPupil.y-leftPupil.y;
+
   // draw eye centers
   circle(debugFace, rightPupil, 3, 1234);
   circle(debugFace, leftPupil, 3, 1234);
+  std::cout << "  RE: " << rightPupil.x << ", " << rightPupil.y << "\n";
+  std::cout << "  LE: " << leftPupil.x  << ", " << leftPupil.y  << "\n";
 
   //-- Find Eye Corners
   if (kEnableEyeCorner) {
@@ -180,6 +195,8 @@ void findEyes(cv::Mat frame_gray, cv::Rect face) {
 //  cv::Rect roi( cv::Point( 0, 0 ), faceROI.size());
 //  cv::Mat destinationROI = debugImage( roi );
 //  faceROI.copyTo( destinationROI );
+
+  return singleEye;
 }
 
 
@@ -204,30 +221,76 @@ cv::Mat findSkin (cv::Mat &frame) {
   return output;
 }
 
+
+/**
+ * @function findHeads
+ */
+std::vector<cv::Rect> findHeads(cv::Mat frame_gray) {
+
+  std::vector<cv::Rect> faces;
+
+  //-- Detect faces
+  face_cascade.detectMultiScale( frame_gray, faces, 1.1, 2, 0|CV_HAAR_SCALE_IMAGE|CV_HAAR_FIND_BIGGEST_OBJECT, cv::Size(150, 150) );
+
+  //-- Show faces found
+  for( int i = 0; i < faces.size(); i++ ) {
+    rectangle(debugImage, faces[i], 1234);
+    line(debugImage, cv::Point(faces[i].x, faces[i].y),
+                cv::Point(faces[i].x+faces[i].width, faces[i].y+faces[i].height), 1234);
+    line(debugImage, cv::Point(faces[i].x, faces[i].y+faces[i].height),
+                cv::Point(faces[i].x+faces[i].width, faces[i].y), 1234);
+  }
+
+  //-- Return all face
+  return faces;
+}
+
+/**
+ * @function findBestHead
+ */
+cv::Rect findBestHead(cv::Mat frame_gray) {
+
+  //-- Detect faces
+  std::vector<cv::Rect> faces = findHeads(frame_gray);
+
+  static cv::Rect bestFace = cv::Rect(frame_gray.cols/2-75, frame_gray.rows/2-75, 150, 150);
+
+  if ( faces.size()>0 )
+	bestFace = faces[0];
+
+  //-- Show Best face found
+  for( int i = 0; i < faces.size(); i++ ) {
+    rectangle(debugImage, bestFace, 8080);
+  }
+
+  //-- Return best face
+  return bestFace;
+}
+
+
 /**
  * @function detectAndDisplay
  */
 void detectAndDisplay( cv::Mat frame ) {
   std::vector<cv::Rect> faces;
-  //cv::Mat frame_gray;
+  cv::Mat frame_gray;
 
   std::vector<cv::Mat> rgbChannels(3);
   cv::split(frame, rgbChannels);
-  cv::Mat frame_gray = rgbChannels[2];
+//  cv::Mat frame_gray = rgbChannels[2];
 
   //cvtColor( frame, frame_gray, CV_BGR2GRAY );
+  cvtColor( frame, frame_gray, cv::COLOR_BGR2GRAY );
   //equalizeHist( frame_gray, frame_gray );
   //cv::pow(frame_gray, CV_64F, frame_gray);
-  //-- Detect faces
-  face_cascade.detectMultiScale( frame_gray, faces, 1.1, 2, 0|CV_HAAR_SCALE_IMAGE|CV_HAAR_FIND_BIGGEST_OBJECT, cv::Size(150, 150) );
-//  findSkin(debugImage);
 
-  for( int i = 0; i < faces.size(); i++ )
-  {
-    rectangle(debugImage, faces[i], 1234);
-  }
+  faces = findHeads(frame_gray);
   //-- Show what you got
   if (faces.size() > 0) {
-    findEyes(frame_gray, faces[0]);
+    std::cout << "Face: " << faces[0].x << ", " << faces[0].y << "; Size: " << 
+	faces[0].width << ", " << faces[0].height << "\n";
+    cv::Rect se = findEyes(frame_gray, faces[0]);
+    std::cout << "  singleEye: " << se.x << ", " << se.y << "\n";
+    std::cout << "  globalEye: " << se.x+faces[0].x << ", " << se.y+faces[0].y << "\n";
   }
 }
